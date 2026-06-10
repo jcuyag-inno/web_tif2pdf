@@ -1,0 +1,10 @@
+*.pyc
+__pycache__/
+*.egg-info/
+.env
+db.sqlite3
+*.log
+venv/
+.DS_Store
+*.zip
+celerybeat-schedule

@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: tif2pdf_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./:/code
+      - ./test_files:/app/data/mnt
+    ports:
+      - "8000:8000"
+    depends_on:
+      - rabbitmq
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+      - DATA_MOUNT_PATH=/app/data/mnt
+    networks:
+      - tif2pdf_network
+
+  celery:
+    build: .
+    command: celery -A tif2pdf worker --loglevel=info
+    volumes:
+      - ./:/code
+      - ./test_files:/app/data/mnt
+    depends_on:
+      - rabbitmq
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+      - DATA_MOUNT_PATH=/app/data/mnt
+    networks:
+      - tif2pdf_network
+
+  celery-beat:
+    build: .
+    command: celery -A tif2pdf beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./:/code
+      - ./test_files:/app/data/mnt
+    depends_on:
+      - rabbitmq
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+      - DATA_MOUNT_PATH=/app/data/mnt
+    networks:
+      - tif2pdf_network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: tif2pdf_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - tif2pdf_network
+
+volumes:
+  db_data: {}
+
+networks:
+  tif2pdf_network:
+    driver: bridge
