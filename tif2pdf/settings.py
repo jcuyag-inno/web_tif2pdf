@@ -43,7 +43,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'django_filters',
-    'django_celery_beat',
     'api',
 ]
 
@@ -192,7 +191,7 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = False
 CELERY_BEAT_SCHEDULE = {
     'sweep-orphaned-conversion-jobs-every-10-minutes': {
         'task': 'api.tasks.clean_orphaned_jobs',     # Update 'api' to your actual
-        'schedule': crontab(minute='*/2'),           # Runs every 2 minutes
+        'schedule': crontab(minute='*/10'),           # Runs every 10 minutes
         # 'args': (),                                # Pass arguments here if your task needed them
     },
 }

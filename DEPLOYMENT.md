@@ -1,170 +1,68 @@
 # Tif2PDF Deployment Guide
 
 ## Overview
-This guide provides step-by-step instructions for deploying the Tif2PDF application using Docker Compose with images pulled from GitHub Container Registry (GHCR). PostgreSQL and RabbitMQ are run as separate standalone containers.
+This guide provides step-by-step instructions for deploying the Tif2PDF application using Docker Compose. PostgreSQL, RabbitMQ, web server, Celery worker, and Celery Beat are all orchestrated via Docker Compose on a shared bridge network.
 
 ---
 
 ## Prerequisites
 
 - Docker Desktop or Docker Engine installed
-- GitHub Account with access to the repository
-- `GITHUB_TOKEN` with `read:packages` permission (for private registries)
-- Docker Compose v1.29+
+- Docker Compose v2.0+
+- 2GB+ available RAM
+- Ports 8000, 5432, 5672, 15672 available
 
 ---
 
-## Step 1: Authenticate with GitHub Container Registry
+## Architecture
 
-If your GHCR repository is private, authenticate Docker with your GitHub token:
-
-```bash
-echo $GITHUB_TOKEN | docker login ghcr.io -u <your-github-username> --password-stdin
 ```
-
-Or interactively:
-
-```bash
-docker login ghcr.io
-```
-
-When prompted:
-- **Username:** Your GitHub username
-- **Password:** Your GitHub Personal Access Token (with `read:packages` scope)
-
----
-
-## Step 2: Start PostgreSQL Container (Standalone)
-
-Run PostgreSQL as a separate container:
-
-```bash
-docker run -d \
-  --name postgres-db \
-  -e POSTGRES_USER=dbuser \
-  -e POSTGRES_PASSWORD=dbpass123 \
-  -e POSTGRES_DB=mydb \
-  -p 5432:5432 \
-  postgres:latest
-```
-
-**Verify it's running:**
-
-```bash
-docker ps --filter "name=postgres-db"
+┌─────────────────────────────────────────────────────────┐
+│           tif2pdf_network (bridge)                      │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
+│  │   postgres   │  │  rabbitmq    │  │   web       │  │
+│  │   :5432      │  │  :5672       │  │   :8000     │  │
+│  └──────────────┘  └──────────────┘  └─────────────┘  │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐                    │
+│  │   celery     │  │ celery-beat  │                    │
+│  │   worker     │  │  scheduler   │                    │
+│  └──────────────┘  └──────────────┘                    │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Step 3: Start RabbitMQ Container (Standalone)
+## Step 1: Clone or Prepare Project
 
-Run RabbitMQ as a separate container:
-
-```bash
-docker run -d \
-  --hostname rabbit \
-  --name rabbitmq \
-  -p 5672:5672 \
-  -p 15672:15672 \
-  rabbitmq:3-management
-```
-
-**Verify it's running:**
-
-```bash
-docker ps --filter "name=rabbitmq"
-```
-
-**Access RabbitMQ Management UI:**
-- URL: `http://localhost:15672`
-- Username: `guest`
-- Password: `guest`
+Ensure your project directory contains:
+- `docker-compose.yml`
+- `Dockerfile`
+- `requirements.txt`
+- `manage.py`
+- `tif2pdf/settings.py`
 
 ---
 
-## Step 4: Update docker-compose.yml
+## Step 2: Start All Services
 
-Update your `docker-compose.yml` to pull images from GHCR instead of building locally. Replace `<your-github-username>` with your actual GitHub username:
-
-```yaml
-version: '3.8'
-
-services:
-  web:
-    image: ghcr.io/<your-github-username>/tif2pdf:latest
-    pull_policy: always
-    container_name: tif2pdf_web
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - ./test_files:/app/data/mnt
-    ports:
-      - "8000:8000"
-    environment:
-      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
-      - CELERY_RESULT_BACKEND=rpc://
-      - DATA_MOUNT_PATH=/app/data/mnt
-      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb
-    networks:
-      - tif2pdf_network
-    depends_on:
-      - rabbitmq
-
-  celery:
-    image: ghcr.io/<your-github-username>/tif2pdf:latest
-    pull_policy: always
-    container_name: tif2pdf_celery
-    command: celery -A tif2pdf worker --loglevel=info
-    volumes:
-      - ./test_files:/app/data/mnt
-    environment:
-      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
-      - CELERY_RESULT_BACKEND=rpc://
-      - DATA_MOUNT_PATH=/app/data/mnt
-      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb
-    networks:
-      - tif2pdf_network
-    depends_on:
-      - rabbitmq
-
-  celery-beat:
-    image: ghcr.io/<your-github-username>/tif2pdf:latest
-    pull_policy: always
-    container_name: tif2pdf_celery_beat
-    command: celery -A tif2pdf beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    volumes:
-      - ./test_files:/app/data/mnt
-    environment:
-      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
-      - CELERY_RESULT_BACKEND=rpc://
-      - DATA_MOUNT_PATH=/app/data/mnt
-      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb
-    networks:
-      - tif2pdf_network
-    depends_on:
-      - rabbitmq
-
-networks:
-  tif2pdf_network:
-    driver: bridge
-```
-
-**Key Changes:**
-- `image:` replaces `build:`
-- `pull_policy: always` ensures latest image is pulled on every `docker compose up`
-- `host.docker.internal` connects Docker containers to host PostgreSQL on port 5432
-- Removed `rabbitmq` service (runs standalone)
-
----
-
-## Step 5: Start Application Services via Docker Compose
-
-Pull latest images and start the application:
+Start all containers (Postgres, RabbitMQ, web, celery, celery-beat) in one command:
 
 ```bash
 docker compose up -d --pull always
 ```
 
-**Verify services are running:**
+**What this does:**
+- Pulls latest base images
+- Builds the web/celery/celery-beat image from local Dockerfile
+- Creates bridge network `tif2pdf_network`
+- Starts all 5 services with health checks
+- Respects `depends_on` conditions (web/celery wait for Postgres & RabbitMQ to be healthy)
+
+**Verify all services are running:**
 
 ```bash
 docker compose ps
@@ -172,89 +70,149 @@ docker compose ps
 
 Expected output:
 ```
-NAME                    STATUS
-tif2pdf_web             Up (Healthy)
-tif2pdf_celery          Up
-tif2pdf_celery_beat     Up
+NAME                  IMAGE                          STATUS
+tif2pdf_web           tif2pdf-web                    Up (healthy)
+tif2pdf_celery        tif2pdf-celery                 Up
+tif2pdf_celery_beat   tif2pdf-celery-beat            Up
+tif2pdf_postgres      postgres:15-alpine             Up (healthy)
+tif2pdf_rabbitmq      rabbitmq:3-management-alpine   Up (healthy)
 ```
 
 ---
 
-## Step 6: Verify Connectivity
+## Step 3: Run Database Migrations
+
+On first deployment (or after adding new migrations), apply them:
+
+```bash
+docker compose exec web python manage.py migrate
+```
+
+This initializes all Django tables in PostgreSQL.
+
+---
+
+## Step 4: Create Admin User (Optional)
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+Follow the prompts to create a Django admin account.
+
+---
+
+## Step 5: Verify Services and Connectivity
 
 ### Check web application:
 ```bash
 curl http://localhost:8000
 ```
 
-### Check Celery logs:
+Expected: Django response (or admin login page)
+
+### Check Celery worker status:
 ```bash
-docker compose logs celery -f
+docker compose logs celery --tail 30
 ```
 
-### Check web logs:
+Expected: `celery@<container-id> ready.`
+
+### Check Celery Beat status:
 ```bash
-docker compose logs web -f
+docker compose logs celery-beat --tail 10
 ```
 
-### Verify PostgreSQL connection:
+Expected: Beat scheduler initialization logs
+
+### Check PostgreSQL:
 ```bash
-docker exec postgres-db psql -U dbuser -d mydb -c "SELECT 1;"
+docker compose exec postgres psql -U postgres -d tif2pdf -c "SELECT 1;"
 ```
 
-### Verify RabbitMQ connection:
+Expected: `1` (single row)
+
+### Check RabbitMQ:
 ```bash
-docker exec rabbitmq rabbitmq-diagnostics -q ping
+docker compose exec rabbitmq rabbitmq-diagnostics -q ping
+```
+
+Expected: `ok`
+
+### Access RabbitMQ Management UI:
+- URL: `http://localhost:15672`
+- Username: `guest`
+- Password: `guest`
+
+---
+
+## Service Environment Variables
+
+All environment variables are configured in `docker-compose.yml`. Key variables:
+
+| Service | Variable | Value | Purpose |
+|---------|----------|-------|---------|
+| web, celery, celery-beat | `DB_ENGINE` | `django.db.backends.postgresql` | Enable PostgreSQL |
+| web, celery, celery-beat | `DB_HOST` | `postgres` | PostgreSQL hostname (service name) |
+| web, celery, celery-beat | `DB_PORT` | `5432` | PostgreSQL port |
+| web, celery, celery-beat | `DB_USER` | `postgres` | PostgreSQL user |
+| web, celery, celery-beat | `DB_PASSWORD` | `postgres` | PostgreSQL password |
+| web, celery, celery-beat | `DB_NAME` | `tif2pdf` | Database name |
+| web, celery, celery-beat | `CELERY_BROKER_URL` | `amqp://guest:[REDACTED]@rabbitmq:5672//` | RabbitMQ broker |
+| web, celery, celery-beat | `CELERY_RESULT_BACKEND` | `rpc://` | Celery result storage |
+| web, celery, celery-beat | `DATA_MOUNT_PATH` | `/app/data/mnt` | Data volume mount point |
+| postgres | `POSTGRES_USER` | `postgres` | Postgres superuser |
+| postgres | `POSTGRES_PASSWORD` | `postgres` | Postgres password |
+| postgres | `POSTGRES_DB` | `tif2pdf` | Initial database |
+| rabbitmq | `RABBITMQ_DEFAULT_USER` | `guest` | RabbitMQ user |
+| rabbitmq | `RABBITMQ_DEFAULT_PASS` | `guest` | RabbitMQ password |
+
+---
+
+## Updating Code and Rebuilding
+
+When you make changes to application code:
+
+### Option 1: Rebuild and restart just the web service
+```bash
+docker compose build web
+docker compose up --no-deps -d web
+```
+
+### Option 2: Rebuild all services and restart everything
+```bash
+docker compose build
+docker compose up -d
+```
+
+### Option 3: Use Compose Watch for automatic live reloads (development)
+Add this to `docker-compose.yml` under the `web` service:
+
+```yaml
+web:
+  develop:
+    watch:
+      - action: sync+restart
+        path: .
+        target: /code
+```
+
+Then run:
+```bash
+docker compose watch
 ```
 
 ---
 
-## Stopping All Services
+## Managing Services
 
-### Stop Docker Compose services:
+### View logs for a specific service:
 ```bash
-docker compose down
-```
-
-### Stop standalone containers:
-```bash
-docker stop postgres-db rabbitmq
-```
-
-### Remove all (including data):
-```bash
-docker compose down
-docker rm postgres-db rabbitmq
-docker volume prune
-```
-
----
-
-## Useful Commands
-
-### Pull specific image version by commit SHA:
-```bash
-docker compose pull
-```
-
-### View running containers:
-```bash
-docker ps
-```
-
-### View all containers (including stopped):
-```bash
-docker ps -a
-```
-
-### Restart a service:
-```bash
-docker compose restart web
-```
-
-### Execute command in running container:
-```bash
-docker compose exec web python manage.py migrate
+docker compose logs web -f         # web server
+docker compose logs celery -f      # celery worker
+docker compose logs celery-beat -f # celery beat
+docker compose logs postgres -f    # PostgreSQL
+docker compose logs rabbitmq -f    # RabbitMQ
 ```
 
 ### View logs for all services:
@@ -262,54 +220,215 @@ docker compose exec web python manage.py migrate
 docker compose logs -f
 ```
 
-### Re-pull and recreate all services:
+### Restart a service:
 ```bash
-docker compose up -d --pull always --force-recreate
+docker compose restart web          # Restart web
+docker compose restart celery       # Restart celery
+docker compose restart postgres     # Restart postgres
 ```
+
+### Execute a command in a running container:
+```bash
+docker compose exec web python manage.py shell
+docker compose exec web python manage.py createsuperuser
+docker compose exec postgres psql -U postgres
+```
+
+### Stop all services (keep data):
+```bash
+docker compose stop
+```
+
+### Start stopped services:
+```bash
+docker compose start
+```
+
+### Stop and remove all services (keep data/volumes):
+```bash
+docker compose down
+```
+
+### Stop and remove everything including volumes (destroys data):
+```bash
+docker compose down -v
+```
+
+---
+
+## Networking
+
+All services communicate via the `tif2pdf_network` bridge network using service names:
+
+- Web/Celery → Postgres: `DB_HOST=postgres:5432`
+- Web/Celery → RabbitMQ: `CELERY_BROKER_URL=amqp://...@rabbitmq:5672//`
+- External access:
+  - Web: `http://localhost:8000`
+  - RabbitMQ UI: `http://localhost:15672`
+  - Postgres: `localhost:5432` (from host machine only)
+
+---
+
+## Data Persistence
+
+- **Database data:** Stored in Docker volume `tif2pdf_db_data`
+- **Application data:** Volume mounted at `/app/data/mnt` (map to `./test_files` by default)
+
+View volumes:
+```bash
+docker volume ls | grep tif2pdf
+```
+
+Inspect volume:
+```bash
+docker volume inspect tif2pdf_db_data
+```
+
+---
+
+## Production Considerations
+
+### Security:
+1. Change default RabbitMQ credentials in `docker-compose.yml`
+2. Change default PostgreSQL credentials in `docker-compose.yml`
+3. Use a `.env` file for sensitive variables (with `env_file:` in compose file)
+4. Set `DEBUG=False` in Django settings for production
+5. Use strong `SECRET_KEY`
+
+### Performance:
+1. Increase Celery worker concurrency (set `CELERY_WORKER_CONCURRENCY` in settings)
+2. Scale workers horizontally by running multiple celery containers
+3. Configure PostgreSQL memory and connection limits
+4. Use external result backend (e.g., Redis) instead of `rpc://`
+
+### Monitoring:
+1. Use `docker compose logs` or centralized logging (ELK, Splunk, etc.)
+2. Monitor container resource usage: `docker stats`
+3. Set up Celery monitoring with Flower
+4. Enable RabbitMQ monitoring via management UI
+
+### Backup:
+1. Back up `tif2pdf_db_data` volume regularly
+2. Back up application files in `./test_files` (or mapped volume)
 
 ---
 
 ## Troubleshooting
 
-### Images not pulling:
-- Ensure you're logged in: `docker login ghcr.io`
-- Verify GitHub username is correct in image URL
-- Check token has `read:packages` permission
+### Services won't start
+```bash
+docker compose logs
+```
+Check for errors in log output. Common issues:
+- Port already in use (change port mapping in `docker-compose.yml`)
+- Insufficient memory (increase Docker memory limit)
+- Old images cached (use `docker compose pull` first)
 
-### Connection refused to PostgreSQL:
-- Verify `postgres-db` is running: `docker ps --filter "name=postgres-db"`
-- Check port mapping: `docker port postgres-db`
-- Use `host.docker.internal` (not `localhost`) from Docker containers
+### Postgres connection refused
+```bash
+docker compose logs postgres
+docker compose exec postgres pg_isready -U postgres
+```
+Verify Postgres is healthy and DNS resolution works.
 
-### Connection refused to RabbitMQ:
-- Verify `rabbitmq` is running: `docker ps --filter "name=rabbitmq"`
-- Check port mapping: `docker port rabbitmq`
-- Access management UI: `http://localhost:15672` (guest/guest)
+### Celery not processing tasks
+```bash
+docker compose logs celery
+```
+Check that:
+- Celery worker is connected to RabbitMQ
+- Tasks are defined in `api/tasks.py`
+- No exceptions in task execution
 
-### Celery not processing tasks:
-- Check broker URL environment variable
-- Verify RabbitMQ is running and accessible
-- Review celery logs: `docker compose logs celery`
+### RabbitMQ connection refused
+```bash
+docker compose logs rabbitmq
+docker compose exec rabbitmq rabbitmq-diagnostics -q ping
+```
+
+### Database migrations not applied
+```bash
+docker compose exec web python manage.py showmigrations
+docker compose exec web python manage.py migrate
+```
+
+### Out of disk space
+```bash
+docker system df
+docker system prune -a
+```
 
 ---
 
-## Environment Variables
+## Useful Commands Summary
 
-Update these in `docker-compose.yml` if needed:
+```bash
+# Start services
+docker compose up -d
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `CELERY_BROKER_URL` | `amqp://guest:guest@rabbitmq:5672//` | RabbitMQ connection |
-| `CELERY_RESULT_BACKEND` | `rpc://` | Celery result storage |
-| `DATA_MOUNT_PATH` | `/app/data/mnt` | Application data mount point |
-| `DATABASE_URL` | `postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb` | PostgreSQL connection |
+# Stop services
+docker compose down
+
+# View logs
+docker compose logs -f
+
+# Execute command
+docker compose exec web python manage.py migrate
+
+# Rebuild images
+docker compose build
+
+# Pull latest base images
+docker compose pull
+
+# View container status
+docker compose ps
+
+# View resource usage
+docker stats
+
+# Access database
+docker compose exec postgres psql -U postgres -d tif2pdf
+
+# Clear everything
+docker compose down -v
+```
 
 ---
 
-## Security Notes
+## Environment Files (Production)
 
-- **Never commit** `GITHUB_TOKEN` or database passwords to version control
-- Use `.env` files for sensitive data in production
-- Change default RabbitMQ credentials (`guest:guest`) in production
-- Use strong PostgreSQL passwords
-- Keep images updated: `docker compose pull`
+Create a `.env` file for sensitive data:
+
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_secure_password
+RABBITMQ_DEFAULT_USER=rabbit_user
+RABBITMQ_DEFAULT_PASS=your_secure_password
+SECRET_KEY=your_django_secret_key
+DEBUG=False
+```
+
+Reference in `docker-compose.yml`:
+```yaml
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+```
+
+Then start with:
+```bash
+docker compose --env-file .env up -d
+```
+
+---
+
+## Additional Resources
+
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Django with Docker](https://docs.docker.com/language/python/develop/)
+- [Celery Documentation](https://docs.celeryproject.org/)
+- [RabbitMQ Documentation](https://www.rabbitmq.com/documentation.html)
+- [PostgreSQL Docker Image](https://hub.docker.com/_/postgres)

@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /code
 
 # system dependencies
-RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
 
 # install python dependencies
 COPY requirements.txt /code/requirements.txt
