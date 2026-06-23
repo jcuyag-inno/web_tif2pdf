@@ -44,7 +44,7 @@ docker run -d \
   -e POSTGRES_USER=dbuser \
   -e POSTGRES_PASSWORD=dbpass123 \
   -e POSTGRES_DB=mydb \
-  -p 5433:5432 \
+  -p 5432:5432 \
   postgres:latest
 ```
 
@@ -103,7 +103,7 @@ services:
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=rpc://
       - DATA_MOUNT_PATH=/app/data/mnt
-      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5433/mydb
+      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb
     networks:
       - tif2pdf_network
     depends_on:
@@ -120,7 +120,7 @@ services:
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=rpc://
       - DATA_MOUNT_PATH=/app/data/mnt
-      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5433/mydb
+      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb
     networks:
       - tif2pdf_network
     depends_on:
@@ -137,7 +137,7 @@ services:
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=rpc://
       - DATA_MOUNT_PATH=/app/data/mnt
-      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5433/mydb
+      - DATABASE_URL=postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb
     networks:
       - tif2pdf_network
     depends_on:
@@ -151,7 +151,7 @@ networks:
 **Key Changes:**
 - `image:` replaces `build:`
 - `pull_policy: always` ensures latest image is pulled on every `docker compose up`
-- `host.docker.internal` connects Docker containers to host PostgreSQL on port 5433
+- `host.docker.internal` connects Docker containers to host PostgreSQL on port 5432
 - Removed `rabbitmq` service (runs standalone)
 
 ---
@@ -302,7 +302,7 @@ Update these in `docker-compose.yml` if needed:
 | `CELERY_BROKER_URL` | `amqp://guest:guest@rabbitmq:5672//` | RabbitMQ connection |
 | `CELERY_RESULT_BACKEND` | `rpc://` | Celery result storage |
 | `DATA_MOUNT_PATH` | `/app/data/mnt` | Application data mount point |
-| `DATABASE_URL` | `postgresql://dbuser:dbpass123@host.docker.internal:5433/mydb` | PostgreSQL connection |
+| `DATABASE_URL` | `postgresql://dbuser:dbpass123@host.docker.internal:5432/mydb` | PostgreSQL connection |
 
 ---
 
