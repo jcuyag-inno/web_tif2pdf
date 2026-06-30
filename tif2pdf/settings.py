@@ -166,7 +166,7 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Acknowledge tasks ONLY after the function returns successfully. 
 # If the container crashes mid-conversion, RabbitMQ will requeue it.
-CELERY_TASK_ACKS_LATE = True
+# CELERY_TASK_ACKS_LATE = True
 
 # Prevent workers from reserving multiple heavy tasks in memory.
 # They will only take 1 task at a time.
@@ -181,11 +181,12 @@ CELERY_WORKER_CONCURRENCY = 1
 # CELERY_TASK_TIME_LIMIT = 1800 # 30 minutes
 # CELERY_TASK_SOFT_TIME_LIMIT = 1800 # 30 minutes
 
-CELERY_WORKER_MAX_MEMORY_PER_CHILD = 2000000 # 2GB - adjust based on your server's RAM and expected file sizes. This will restart the worker if it exceeds this memory limit, preventing crashes due to memory leaks or extremely large files.
+# CELERY_WORKER_MAX_MEMORY_PER_CHILD = 2000000 # 2GB - adjust based on your server's RAM and expected file sizes. This will restart the worker if it exceeds this memory limit, preventing crashes due to memory leaks or extremely large files.
 
 
 # If the child worker process drops dead (OOM), instantly put the job back in the queue
 CELERY_TASK_REJECT_ON_WORKER_LOST = False
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 2  # Restart the worker after each task to free up memory and prevent memory leaks.
 
 
 CELERY_BEAT_SCHEDULE = {
