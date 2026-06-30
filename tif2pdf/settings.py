@@ -79,10 +79,9 @@ WSGI_APPLICATION = 'tif2pdf.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
+DB_ENGINE = config('DB_ENGINE', default='django.db.backends.postgresql')
 
-if DB_ENGINE == 'django.db.backends.postgresql':
-    DATABASES = {
+DATABASES = {
         'default': {
             'ENGINE': DB_ENGINE,
             'NAME': config('DB_NAME', default='pdf_scan_db'),
@@ -92,14 +91,27 @@ if DB_ENGINE == 'django.db.backends.postgresql':
             'PORT': config('DB_PORT', default=5432, cast=int),
         }
     }
-else:
-    # SQLite fallback for local development without .env
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+
+
+# if DB_ENGINE == 'django.db.backends.postgresql':
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': DB_ENGINE,
+#             'NAME': config('DB_NAME', default='pdf_scan_db'),
+#             'USER': config('DB_USER', default='scan_user'),
+#             'PASSWORD': config('DB_PASSWORD', default='strongpassword'),
+#             'HOST': config('DB_HOST', default='localhost'),
+#             'PORT': config('DB_PORT', default=5432, cast=int),
+#         }
+#     }
+# else:
+#     # SQLite fallback for local development without .env
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': BASE_DIR / 'db.sqlite3',
+#         }
+#     }
 
 
 # Password validation

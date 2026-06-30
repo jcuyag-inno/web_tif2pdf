@@ -53,7 +53,7 @@ services:
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - DB_NAME=tif2pdf
+      - DB_NAME=tif2pdf_db
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=rpc://
       - DATA_MOUNT_PATH=/app/data/mnt
@@ -78,7 +78,7 @@ services:
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - DB_NAME=tif2pdf
+      - DB_NAME=tif2pdf_db
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=rpc://
       - DATA_MOUNT_PATH=/app/data/mnt
@@ -103,7 +103,7 @@ services:
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - DB_NAME=tif2pdf
+      - DB_NAME=tif2pdf_db
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=rpc://
       - DATA_MOUNT_PATH=/app/data/mnt
