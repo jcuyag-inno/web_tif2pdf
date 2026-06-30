@@ -35,7 +35,6 @@ services:
 
   web:
     build: .
-    container_name: tif2pdf_web
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./:/code
@@ -62,7 +61,6 @@ services:
 
   celery:
     build: .
-    container_name: tif2pdf_celery
     command: celery -A tif2pdf worker --loglevel=info
     volumes:
       - ./:/code
@@ -87,7 +85,6 @@ services:
 
   celery-beat:
     build: .
-    container_name: tif2pdf_celery_beat
     command: celery -A tif2pdf beat --loglevel=info
     volumes:
       - ./:/code
