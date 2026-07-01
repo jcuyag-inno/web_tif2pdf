@@ -42,7 +42,8 @@ def convert_tif_to_pdf_task(job_id):
         # img2pdf is efficient with RAM, but 16GB writes take time.
         # We write to a stream to keep memory usage low.
         with open(output_pdf_path, "wb") as f:
-            img2pdf.convert(*tif_files, outputstream=f)
+            # img2pdf.convert(*tif_files, outputstream=f)
+            f.write(img2pdf.convert(tif_files))
             
         job.status = 'SUCCESS'
         job.processed_files = len(tif_files)
