@@ -157,8 +157,8 @@ REST_FRAMEWORK = {
 }
 
 # Folder mount point for the TIFs (e.g., mounted via Docker volume)
-MOUNTED_DATA_DIR = Path(os.getenv("DATA_MOUNT_PATH", "/home/jc/project/fde_scanning/tif2pdf/test_files"))
-
+# MOUNTED_DATA_DIR = Path(os.getenv("DATA_MOUNT_PATH", "/home/jc/project/fde_scanning/tif2pdf/test_files"))
+MOUNTED_DATA_DIR = Path(".")
 
 # Celery configuration
 # Uses RabbitMQ by default. Override with the environment variable
@@ -198,7 +198,7 @@ CELERY_WORKER_CONCURRENCY = 1
 
 # If the child worker process drops dead (OOM), instantly put the job back in the queue
 CELERY_TASK_REJECT_ON_WORKER_LOST = False
-CELERY_WORKER_MAX_TASKS_PER_CHILD = 2  # Restart the worker after each task to free up memory and prevent memory leaks.
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1  # Restart the worker after each task to free up memory and prevent memory leaks.
 
 
 CELERY_BEAT_SCHEDULE = {
